@@ -1,7 +1,7 @@
 package com.santiago.exception;
 
 public class InvalidGameException extends Exception {
-    private String message;
+    private final String message;
 
     public InvalidGameException(String message) {
         this.message = message;
