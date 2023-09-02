@@ -32,7 +32,7 @@ public class GameService {
 
     public Game connectToGame(Player player2, String gameId)
             throws InvalidParamException, InvalidGameException {
-        if (GameStorage.getInstance().getGames().containsKey(gameId)) {
+        if (!GameStorage.getInstance().getGames().containsKey(gameId)) {
             throw new InvalidParamException("Game with provided id does not exist");
         }
 
@@ -71,10 +71,12 @@ public class GameService {
 
         int[][] board = game.getBoard();
         board[gamePlay.getCoordinateY()][gamePlay.getCoordinateX()] = gamePlay.getType().getValue();
-        checkWinner(game.getBoard(), TicToe.X);
-        checkWinner(game.getBoard(), TicToe.O);
 
-        //GameStorage.getInstance().setGame(game);
+        if (checkWinner(board, TicToe.X)) {
+            game.setWinner(TicToe.X);
+        } else if (checkWinner(board, TicToe.O)) {
+            game.setWinner(TicToe.O);
+        }
 
         return game;
     }
@@ -102,8 +104,8 @@ public class GameService {
 
         for (int[] line : winCombinations) {
             int counter = 0;
-            for (int symbol : line) {
-                if (symbol == playerSymbol.getValue()) {
+            for (int index : line) {
+                if (boardArray[index] == playerSymbol.getValue()) {
                     counter++;
                     if (counter == 3) {
                         return true;
