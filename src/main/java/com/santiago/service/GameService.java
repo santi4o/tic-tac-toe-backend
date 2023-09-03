@@ -7,17 +7,26 @@ import com.santiago.model.Game;
 import com.santiago.model.GamePlay;
 import com.santiago.model.Player;
 import com.santiago.model.TicToe;
-import com.santiago.storage.GameStorage;
-import lombok.AllArgsConstructor;
+import com.santiago.repository.GameRepository;
+import com.santiago.repository.PlayerRepository;
+
 import org.springframework.stereotype.Service;
 
+import java.util.List;
 import java.util.UUID;
 
 import static com.santiago.model.GameStatus.*;
 
 @Service
-@AllArgsConstructor
 public class GameService {
+    private GameRepository gameRepository;
+    private PlayerRepository playerRepository;
+
+    public GameService(GameRepository gameRepository, PlayerRepository playerRepository) {
+        this.gameRepository = gameRepository;
+        this.playerRepository = playerRepository;
+    }
+
     public Game createGame(Player player) {
         Game game = new Game();
         game.setBoard(new int[3][3]);
@@ -25,45 +34,57 @@ public class GameService {
         game.setPlayer1(player);
         game.setStatus(NEW);
 
-        GameStorage.getInstance().setGame(game);
+        if (!playerRepository.existsById(player.getId())) {
+            playerRepository.save(player);
+        }
+
+        gameRepository.save(game);
 
         return game;
     }
 
     public Game connectToGame(Player player2, String gameId)
             throws InvalidParamException, InvalidGameException {
-        if (!GameStorage.getInstance().getGames().containsKey(gameId)) {
+        if (!gameRepository.existsById(gameId)) {
             throw new InvalidParamException("Game with provided id does not exist");
         }
 
-        Game game = GameStorage.getInstance().getGames().get(gameId);
+        Game game = gameRepository.findById(gameId).get();
         if (game.getPlayer2() != null) {
             throw new InvalidGameException("Game does not allow any more players");
         }
 
+        if (!playerRepository.existsById(player2.getId())) {
+            playerRepository.save(player2);
+        }
+
         game.setPlayer2(player2);
         game.setStatus(IN_PROGRESS);
-        GameStorage.getInstance().setGame(game);
+        gameRepository.save(game);
         return game;
     }
 
     public Game connectToRandomGame(Player player2) throws NotFoundException {
-        Game game = GameStorage.getInstance().getGames().values().stream()
-                .filter(it -> it.getStatus().equals(NEW)).findFirst()
-                .orElseThrow(() -> new NotFoundException("Game not found"));
+        List<Game> games = gameRepository.findByStatus(NEW);
+
+        if (games.size() == 0) {
+            throw new NotFoundException("No new games found");
+        }
+
+        Game game = games.get(0);
 
         game.setPlayer2(player2);
         game.setStatus(IN_PROGRESS);
-        GameStorage.getInstance().setGame(game);
+        gameRepository.save(game);
         return game;
     }
 
     public Game gamePlay(GamePlay gamePlay) throws NotFoundException, InvalidGameException {
-        if (!GameStorage.getInstance().getGames().containsKey(gamePlay.getGameId())) {
+        if (!gameRepository.existsById(gamePlay.getGameId())) {
             throw new NotFoundException("Game not found");
         }
 
-        Game game = GameStorage.getInstance().getGames().get(gamePlay.getGameId());
+        Game game = gameRepository.findById(gamePlay.getGameId()).get();
 
         if (game.getStatus().equals(FINISHED)) {
             throw new InvalidGameException("Game is already finished");
@@ -74,9 +95,13 @@ public class GameService {
 
         if (checkWinner(board, TicToe.X)) {
             game.setWinner(TicToe.X);
+            game.setStatus(FINISHED);
         } else if (checkWinner(board, TicToe.O)) {
             game.setWinner(TicToe.O);
+            game.setStatus(FINISHED);
         }
+
+        gameRepository.save(game);
 
         return game;
     }
